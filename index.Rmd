@@ -1,5 +1,5 @@
 ---
-title: "Fighting Twitterbots or how to help Elon Musk buy Twitter "
+title: "Fighting Twitterbots or why Elon Musk wont buy Twitter"
 description: |
  Detecting and Evaluating twitterbots in a #Drosten relatet dataset!
 output: 
@@ -18,9 +18,11 @@ knitr::opts_chunk$set(echo = FALSE)
 
 ## Why is this important? 
 
-Detecting non-human Twitter users has been of interest to academics. Indiana University has developed a free service called **Botometer**, which scores Twitter handles based on their likelihood of being a Twitterbot. Already in 2009, Twitter bots were estimated to create approximately 24% of tweets on Twitter. One academic study in 2017 estimated that **up to 15%** of Twitter users were automated bot accounts. And the prevalence of Twitter bots coupled with the ability of some bots to give seemingly human responses has enabled these non-human accounts to garner **widespread influence**, in both positive and negative ways. 
+Detecting non-human Twitter users has been of interest not only to Elon Musk but also to academics. Indiana University has developed a free service called **Botometer**, which scores Twitter handles based on their likelihood of being a Twitterbot. Already in 2009, Twitter bots were estimated to create approximately 24% of tweets on Twitter. One academic study in 2017 estimated that **up to 15%** of Twitter users were automated bot accounts. And the prevalence of Twitter bots coupled with the ability of some bots to give seemingly human responses has enabled these non-human accounts to garner **widespread influence**, in both positive and negative ways. 
 
 This project will address the question whether a **specific twitter dataset** - consisting of all tweets mentioning #Drosten or @c_drosten in the years 2020 and 2021 - contains bots and how they evolve over time. 
+
+Furthermore, the project wants to find out whether there is a certain emotionality in the tweets of the bots and whether this differs from the human like tweets. 
 
 
 ## Research Questions
@@ -44,7 +46,7 @@ This project will address the question whether a **specific twitter dataset** - 
 
 **Sentiment Analysis**
 
-4. Step [ ] Perform Sentiment Analysis with the tweets indenified as "bot-like"
+4. Step [ ] Perform Sentiment Analysis with the tweets indenified as "bot-like" vs "human-like"
 
 
 
@@ -190,7 +192,7 @@ tweets_agg = tweets %>%
 
 ```
 
-#### word cloud
+#### wordcloud visualisation (so far)
 ```{r, warning=FALSE, message=FALSE}
 stopwords <- stopwords("german")
 
@@ -208,17 +210,42 @@ wordcloud(words = docs$word,  min.freq = 15,
           scale = c(3.5,1.0), random.order= FALSE, 
           colors=c("#67a9cf", "#bdc9e1", "#74a9cf", "#2b8cbe", "#045a8d"))
 ```
+## Results 
+
+### Threshold 
 
 
-```{r, warning=FALSE, message=FALSE}
-
+```{r}
+hist(all_tweets_botchecked$cap.universal)
+abline(v = 0.8, col = "red")
+hist(all_tweets_botchecked$raw_scores.universal.overall)
 ```
 
-##### Plot 
+
+### How many Bots are in the dataset? 
+
+```{r, warning=FALSE, message=FALSE}
+p <- tweets %>%
+  select(yweek, botcheck) %>%
+  drop_na() %>%
+  ggplot(mapping = aes(x= yweek, fill=botcheck))+
+  facet_wrap(~botcheck)
+
+p + geom_histogram() + theme_minimal()+ 
+  ggtitle("Total Tweets over Time in the #Drosten dataset - CAP 0.8")+
+  xlab("Time in Weeks from 2020 - 2021")+ 
+  ylab("frequency")
+```
+
+### Sentiment 
 
 ```{r, warning=FALSE, message= FALSE}
 ggplot(tweets_agg, aes(x=yweek, y=sentiment, col = botcheck)) + 
   geom_line() + ylim(-.2, .2) + theme_minimal() +
   theme(legend.text = element_text(size=10),
         axis.text.x = element_text(size=10, angle=90), 
-        axis.text.y = element_text(size=10)) 
+        axis.text.y = element_text(size=10))
+```
+
+## Limitations
+```{r, warning=FALSE, message= FALSE}

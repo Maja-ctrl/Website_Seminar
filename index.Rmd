@@ -36,7 +36,7 @@ This project will address the question whether a **specific twitter dataset** - 
 
 **Botometer**
 
-1. Step [x] Process all tweets by using the botometer API: https://botometer.osome.iu.edu
+1. Step [ ] Process all tweets by using the botometer API: https://botometer.osome.iu.edu
 
 2. Step [ ] Interpret the results and find a suited threshold 
 
@@ -81,13 +81,10 @@ setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
 ```
 
 ```{r, warning=FALSE, message= FALSE}
-# ### sentiment analysis von Loris skript, bisschen abgeändert 
 # load sentiment files
-# negativ <- read.table("~/Desktop/NLP_2021Autumn/SentiWS_v2/SentiWS_v2.0_Negative.txt", fill = TRUE,encoding = "UTF-8")
-# positiv <- read.table("~/Desktop/NLP_2021Autumn/SentiWS_v2/SentiWS_v2.0_Positive.txt", fill = TRUE,encoding = "UTF-8")
+negativ <- read.table("~/Documents/GitHub/Analysing-Drosten/1_data/SentiWS_v2.0_Negative.txt", fill = TRUE,encoding = "UTF-8")
+positiv <- read.table("~/Documents/GitHub/Analysing-Drosten/1_data/SentiWS_v2.0_Positive.txt", fill = TRUE,encoding = "UTF-8")
 
-negativ <- read.table("SentiWS_v2.0_Negative.txt", fill = TRUE,encoding = "UTF-8")
-positiv <- read.table("SentiWS_v2.0_Positive.txt", fill = TRUE,encoding = "UTF-8")
 
 #delete the NN stuff
 negativ = separate(data = negativ, col = V1, sep =  "[|]", into = "V1")
@@ -117,7 +114,7 @@ for (i in 1:1759) {
 new_negativ <- cbind(as.character(einzelworteframe_negativ[,1]), sentiment_score)
 new_negativ <- rbind(negativ[,1:2], new_negativ)
 
-# same for positive
+# same for positiv
 number_words <- summary(einzelworte_positiv)
 
 sentiment_score <- NULL
@@ -140,250 +137,88 @@ lexicon$V2 = as.numeric(lexicon$V2)
 lexicon$V1 = str_to_lower(lexicon$V1)
 lexikey = as_key(lexicon)
 
-```
+####### tokenize tweets #####################
 
-```{r}
-#### tweets einlesen ####
-tweets <- readRDS("~/Documents/GitHub/Analysing-Drosten/2_code/all_tweets_botchecked")
-###
-```
 
-```{r , include=FALSE}
-### tweets verarbeiten
-#all_tweets <- read_csv("NLP-project/all_tweets.csv")
-main_text <- str_to_lower(tweets$text)
-
-text_tbl <- tibble(main_text)
-text_tbl$id <- c(1:1907349)
-text_tbl$botcheck <- tweets$botcheck
-text_tbl$time <- tweets$created_at
-
-token.tbl <- text_tbl %>% 
-  unnest_tokens(word, main_text)
-
-token.tbl <- tibble(token.tbl)
-
+# lexikey 
 lexikey$word <- lexikey$x
 lexikey$value <- lexikey$y
 lexikey <- lexikey %>% select(word,value)
 
-tbl <- full_join(lexikey, token.tbl, keep=FALSE)
-tbl <- token.tbl %>% 
-  inner_join(lexikey)
 
-average <- groupwiseMean(value ~ id ,
-                         na.rm =TRUE,
-                         traditional =FALSE,
-                         data=tbl)
+```
 
-average <- average %>% select(id, Mean)
-tweets <- merge(tbl,average,by="id")
-tweets$date <- as.Date(tweets$time)
-tweets$month <- str_sub(tweets$date, 1,7)
-tweets$year <- str_sub(tweets$date, 1,4)
-tweets$week <- strftime(tweets$date, format = "%V")
+```{r}
+#### tweets einlesen ####
+all_tweets_botchecked <- readRDS("~/Desktop/all_tweets_botchecked.RDS")
+###
 
-summary <- groupwiseMean(value ~ party + month,
-                         data = tweets)
+require(lubridate)
 
-summary.weekly <- groupwiseMean(value ~ party + week + year,
-                         data = tweets)
+tweets <- all_tweets_botchecked %>% 
+  as_tibble() %>% readr::type_convert() %>% 
+  select(created_at, id, text, entities, in_reply_to_user_id, 
+         author_id, cap.universal, lang, botcheck) %>% 
+  dplyr::mutate(main = str_to_lower(text),
+         id = 1:dplyr::n()) %>% 
+  dplyr::rename(time = created_at) %>%
+  mutate(year_index = lubridate::year(time)-2020,
+         yday = lubridate::yday(time) + year_index*365,
+         yweek = lubridate::week(time) + year_index*52)
 
-## die "langweiligen" entfernen also einfach nur die mit etwas spannenderen Werten
-#das Muster ist sowieso interessanterweise fast das selbe
-interesting <- tweets %>% filter(between (value, -1, -.1) | between(value,.1,1) )
-summary.int <-groupwiseMean(value ~ party + month,
-                            data = interesting,
-                            traditional = FALSE)
-summary.week.int <-groupwiseMean(value ~ party + week + year,
-                            data = interesting,
-                            traditional = FALSE)
+
+tweets_sent <- tweets %>% 
+  unnest_tokens(word, main) %>% 
+  inner_join(lexikey) %>% 
+  dplyr::group_by(id) %>% 
+  dplyr::summarize(value = mean(value))
+
+tweets = tweets %>% 
+  left_join(tweets_sent, by = "id")
+
+tweets_agg = tweets %>% 
+  filter(!is.na(botcheck), !is.na(value)) %>%
+  dplyr::group_by(yweek, botcheck) %>% 
+  dplyr::summarize(sentiment = mean(value))
+
+
+```
+
+```{r , include=FALSE}
+### tweets verarbeiten
+
+
 ```
 
 #### word cloud
-```{r}
-wordcloud(token.tbl$word)
-#oder
+```{r, warning=FALSE, message=FALSE}
 stopwords <- stopwords("german")
-#token_frequencies <- table(token.tbl$word)
-#token_frequencies <- token_frequencies %>% sort(decreasing = TRUE)
-#stops <- names(token_frequencies) %in% stopwords 
 
-docs <- token.tbl %>% filter(!word %in% stopwords)
+tweets_word <- tweets %>% 
+  unnest_tokens(word, main)
+
+token_frequencies <- table(tweets_word$word)
+token_frequencies <- token_frequencies %>% sort(decreasing = TRUE)
+stops <- names(token_frequencies) %in% stopwords 
+
+docs <- tweets_word %>% filter(!word %in% stopwords)
 
 wordcloud(words = docs$word,  min.freq = 15,
-              max.words=500, rot.per=0.35,# ordered.colors=TRUE,
-              scale = c(3.5,1.0), random.order= FALSE, 
-              colors=c("#67a9cf", "#bdc9e1", "#74a9cf", "#2b8cbe", "#045a8d"))
+          max.words=500, rot.per=0.35, #ordered.colors=TRUE,
+          scale = c(3.5,1.0), random.order= FALSE, 
+          colors=c("#67a9cf", "#bdc9e1", "#74a9cf", "#2b8cbe", "#045a8d"))
+```
+
+
+```{r, warning=FALSE, message=FALSE}
+
 ```
 
 ##### Plot 
 
 ```{r, warning=FALSE, message= FALSE}
-monthly <- ggplot(summary.int, 
-       aes(month,Mean, color=party)) +
-  geom_point(size = 1.9) +
-  facet_wrap(~party) +
-  labs(x = "Position", y = 'Sentiment') +
-  theme_minimal() 
-
-weekly <- ggplot(summary.week.int, 
-       aes(week,Mean, color=party, group=year)) +
-  geom_point(size = 1.9) +
-  facet_wrap(~party) +
-  labs(x = "Position", y = 'Sentiment') +
-  theme_minimal() 
-
-monthly | weekly
-
-ggplot(interesting, 
-       aes(time,value, color=party)) +
-  geom_count() +
-  facet_grid(~party) +
-  labs(x = "Position", y = 'Sentiment') +
-  theme_minimal() 
-
-
-ggplot(tweets, 
-       aes(time,value, group=party, color=party, fill=party)) +
-  geom_line() +
-  facet_grid(~party) +
-  labs(x = "Position", y = 'Sentiment') +
-  theme_minimal() 
-
-
-```
-
-```{r}
-data_excel <- read_excel(file.choose())
-data_excel$date <- data_excel$...1
-data_excel <- data_excel %>% select(!1)
-
-data_excel_long <- pivot_longer(data_excel,1:6, names_to="party", values_to = "percent" )
-
-colors <- c("#019EE0", "#ffed00", "#64A12D","#B1013A", "#EB272A", "#000000" )
-parties <- ggplot(data_excel_long, aes(x=date, y=percent, color=party)) +
-  geom_count(size=1.2) +  theme_minimal() + geom_line() +
-  scale_color_manual(values= colors)
-  
-## versuchen dass anzupassen Skala mässig
-# je start wert als referenz nehmen?
-#spd 14 cdu 27  grüne 22  fdp 8  afd 14 linke 9
-
-#prozente draus machen
-data_excel_percent <- data_excel %>% mutate(
-  spd = (SPD/100)-0.14, cdu = (Union/100)-0.27, grüne= (Grüne/100)-0.22, afd=(AfD/100)-0.14, fdp= (FDP/100)-0.08, linke=(Linke/100)-0.09 )
-data_excel_percent <- data_excel_percent  %>% select(7:13)
-data_excel_perc_long <- pivot_longer(data_excel_percent,2:7, names_to="party", values_to = "percent" )
-colors2 <- c("#019EE0","#000000", "#ffed00", "#46962b","#b61c3e", "#e3000f" )
-
-parties <- ggplot(data_excel_perc_long, aes(x=date, y=percent, color=party)) + facet_wrap(~party) +
-  geom_count(size=1.2) +  theme_minimal() + geom_line() + scale_color_manual(values= colors2)
-
-summary.weekly$week.y <-  paste0(summary.weekly$year ,sep="-",summary.weekly$week)
-ggplot(summary.week.int, 
-       aes(week.y,Mean, color=party, group=party)) +
-    geom_point(size = 1.9) +  facet_wrap(~party) +geom_line() +
-    labs(x = "Position", y = 'Sentiment') + ylim(-.5,.5)+
-    theme_minimal() + scale_color_manual(values= colors2) +
-    theme(legend.text = element_text(size=10),
-          axis.text.x = element_text(size=0, angle=90 ),
-          axis.text.y = element_text(size=10)
-    )
-
-
-```
-
-
-```{r}
-## deskriptive / andere plots
-tweets$value <- as.numeric(tweets$value)
-tweets$factor  <- cut(tweets$value, breaks=c(-1 , -0.1, 0.1, 1), labels=c("negative","neutral", "positive"))
-
-tweets2 <- tweets %>% filter(!factor=="NA")
-colors2 <- c("#019EE0","#000000", "#ffed00", "#46962b","#b61c3e", "#e3000f" )
-ggplot (tweets2, aes(x=factor, fill=party )) +
-  geom_bar(position="dodge") +
-  scale_fill_manual(values = colors2)
-  
-colors3 <- c("#e3000f", "#000000","chartreuse4" )
-
-pos.neg <- ggplot (tweets2, aes(x=party, fill=factor )) +
-    geom_bar(position="dodge") + labs(fill=NULL, x=NULL, y=NULL) +
-    scale_fill_manual(values = colors3) +
-  theme_bw() +
-  theme(legend.text = element_text(size=14),
-        axis.text.x = element_text(size=13),
-        axis.text.y = element_text(size=11)
-        )
-
-
-#neg vs pos development
-tweets3 <- tweets2 %>% filter(!factor=="neutral")
-
-mean <- groupwiseMean(value ~ party + month + factor,
-             traditional = FALSE,
-             data =tweets3 )
-colors_2 <- c("red", "chartreuse4")
-ggplot(mean, aes(x=month, y=n, color=factor, group=factor)) +
-    geom_line() + labs(color=NULL, x=NULL, y=NULL) + 
-    facet_wrap(~party ) +
-    scale_color_manual(values = colors_2) + theme_bw() +
-    theme(legend.text = element_text(size=10),
-          axis.text.x = element_text(size=10, angle=90 ),
-          axis.text.y = element_text(size=10)
-    )
-
-weekly_wide <- summary  %>% select(!c(Conf.level,Trad.lower, Trad.upper) )
-
-weekly_wide <- pivot_wider(weekly_wide, c(month), names_from = "party", values_from = "Mean")
- 
-
-weekly_wide <- weekly_wide %>% mutate(
-  spd = spd+0.0284, cdu = cdu+0.0359, grüne= grüne+0.0255, afd=afd+0.0527, fdp= fdp+0.0387, linke=linke+0.0488 )
-
-weekly_long <- pivot_longer(weekly_wide,2:7, names_to = "party", values_to = "percent")  
-
-ggplot(weekly_long, aes(x=month, y=percent, color=party, group=party)) + facet_wrap(~party) + labs(x="difference") +
-  geom_point(size=1.2) +  theme_minimal() + geom_line() + scale_color_manual(values= colors2) + ylim(-0.2, 0.2) +
-    theme(legend.text = element_text(size=10),
-          axis.text.x = element_text(size=10, angle=90 ) )
-
-```
-
-
-```{r}
-weekly_new <- summary.weekly  %>% select(!c(Conf.level,Trad.lower, Trad.upper) )
-
-weekly_new <- pivot_wider(weekly_new, c(week.y), names_from = "party", values_from = "Mean")
-
-weekly_new$week.y <-  paste0(weekly_new$year ,sep="-",weekly_new$week)
-
-weekly_new_wide <- weekly_new %>% mutate(
-  spd = spd+0.02840, cdu = cdu+0.0359, grüne= grüne+0.025500, afd=afd+0.0527, fdp= fdp+0.03870, linke=linke+0.07390 )
-
-weekly_new_long <- pivot_longer(weekly_new_wide,2:7, names_to = "party", values_to = "percent")  
-weekly_new_long <- na.omit(weekly_new_long)
-
-ggplot(weekly_new_long, aes(x=week.y, y=percent, color=party, group=party)) + facet_wrap(~party) + labs(x="difference") +
-  geom_point() +  theme_minimal() +  scale_color_manual(values= colors2)  + ylim(-0.3, 0.3) + geom_line() +
-    theme(legend.text = element_text(size=10),
-          axis.text.x = element_text(size=0, angle=90 ) )
-
-
-new.plot <- ggplot(weekly_new_long, aes(x=week.y, y=percent, color=party, group=party)) + facet_wrap(~party) +
-  labs(x=NULL, y=NULL, color=NULL, group=NULL) +geom_point() +  
-  theme_minimal() +  scale_color_manual(values= colors2)  + ylim(-0.3, 0.3) + geom_line()  +
-  theme(legend.text = element_text(size=0),
-        axis.text.x = element_text(size=0) ) +
-  theme( legend.position="none") +
-  theme(
-        panel.background = element_rect(fill = "transparent"), # bg of the panel
-        plot.background = element_rect(fill = "transparent", color = NA), # bg of the plot
-        panel.grid.major = element_blank(), # get rid of major grid
-        panel.grid.minor = element_blank(), # get rid of minor grid
-        legend.background = element_rect(fill = "transparent"), # get rid of legend bg
-        strip.background = element_blank(),
-        legend.box.background = element_rect(fill = "transparent") # get rid of legend panel bg
-    )
-ggsave(new.plot, filename = "new.plot.png",  bg = "transparent", width="1526", heigt="754")
+ggplot(tweets_agg, aes(x=yweek, y=sentiment, col = botcheck)) + 
+  geom_line() + ylim(-.2, .2) + theme_minimal() +
+  theme(legend.text = element_text(size=10),
+        axis.text.x = element_text(size=10, angle=90), 
+        axis.text.y = element_text(size=10)) 

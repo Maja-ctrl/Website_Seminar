@@ -1,0 +1,13 @@
+{
+  "articles": [
+    {
+      "path": "index.html",
+      "title": "Fighting Twitterbots or how to help Elon Musk buy Twitter ",
+      "description": "Detecting and Evaluating twitterbots in a #Drosten relatet dataset!\n",
+      "author": [],
+      "contents": "\nWhy is this important?\nDetecting non-human Twitter users has been of interest to academics.\nIndiana University has developed a free service called\nBotometer, which scores Twitter handles based on their\nlikelihood of being a Twitterbot. Already in 2009, Twitter bots were\nestimated to create approximately 24% of tweets on Twitter. One academic\nstudy in 2017 estimated that up to 15% of Twitter users\nwere automated bot accounts. And the prevalence of Twitter bots coupled\nwith the ability of some bots to give seemingly human responses has\nenabled these non-human accounts to garner widespread\ninfluence, in both positive and negative ways.\nThis project will address the question whether a specific\ntwitter dataset - consisting of all tweets mentioning #Drosten\nor @c_drosten in\nthe years 2020 and 2021 - contains bots and how they evolve over\ntime.\nResearch Questions\nWhich percentage of the total number of tweets originate from\nbots and does this change as the pandemic progresses?\nAre bots and non-bots taking talking in a different\nvalence?\nThe data\nMethods\nBotometer\nStep [ ] Process all tweets by using the botometer API: https://botometer.osome.iu.edu\nStep [ ] Interpret the results and find a suited\nthreshold\nStep [ ] Analyse the results: Frequency and distribution over\ntime\nSentiment Analysis\nStep [ ] Perform Sentiment Analysis with the tweets indenified as\n“bot-like”\nImplications\nThis small project attempts to contribute to the detection of\npossible bots in a Twitter dataset related to tweets mentioning\nChristian Drosten using #drosten or @c_drosten. It can provide us with\ninformation about the extent to which these Twitter hashtags\nhave been used by bots.\nIn addition, the value of bot tweets can tell us more about the\norigin and goals of the bots created and provide an answer to the\nquestion of whether bots were pushing certain\nissues.\n\n\n\n\n\n\nword cloud\n\n\n\n\n\n\nPlot\n\n\n\n\n\n\n",
+      "last_modified": "2022-05-20T08:23:08+02:00"
+    }
+  ],
+  "collections": []
+}
